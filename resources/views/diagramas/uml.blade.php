@@ -175,16 +175,26 @@
                         defaultRowSeparatorStroke: 'black'
                     })
                     .add(
-                        new go.TextBlock({
+                        new go.Panel("Vertical", {
                             row: 0,
                             columnSpan: 2,
                             margin: 3,
-                            alignment: go.Spot.Center,
-                            font: 'bold 12pt sans-serif',
-                            isMultiline: false,
-                            editable: true
+                            alignment: go.Spot.Center
                         })
-                        .bindTwoWay('text', 'name'),
+                        .add(
+                            new go.TextBlock({
+                                font: "10pt sans-serif",
+                                isMultiline: false,
+                                editable: true
+                            })
+                            .bindTwoWay("text", "stereotype", s => s ? `<<${s}>>` : ""),
+                            new go.TextBlock({
+                                font: "bold 12pt sans-serif",
+                                isMultiline: false,
+                                editable: true
+                            })
+                            .bindTwoWay("text", "name")
+                        ),
                         new go.TextBlock('Properties', {
                             row: 1,
                             font: 'italic 10pt sans-serif'
@@ -382,12 +392,35 @@
                                 e.diagram.commitTransaction("addOperation");
                             }
                         }
+                    }),
+                    new go.Panel("Auto", {
+                        margin: 2
+                    })
+                    .add(
+                        new go.Shape({
+                            fill: "white",
+                            stroke: "gray",
+                            width: 120,
+                            height: 30
+                        }),
+                        new go.TextBlock("Añadir Estereotipo", {
+                            margin: 5
+                        })
+                    )
+                    .set({
+                        click: function(e, obj) {
+                            var node = e.diagram.selection.first();
+                            if (node) {
+                                e.diagram.startTransaction("addStereotype");
+                                e.diagram.model.setDataProperty(node.data, "stereotype", "stereotype");
+                                e.diagram.commitTransaction("addStereotype");
+                            }
+                        }
                     })
                 );
 
             // Asignar el menú contextual al nodeTemplate
             myDiagram.nodeTemplate.contextMenu = contextMenu;
-
             // Function to add a new class
             window.addNewClass = function() {
                 myDiagram.startTransaction('addClass');
