@@ -13,7 +13,9 @@ return new class extends Migration
     {
         Schema::create('diagramas', function (Blueprint $table) {
             $table->id();
-            
+            $table->integer('nombre');
+            $table->string('descripcion');
+            $table->text('contenido')->nullable();
             $table->timestamps();
         });
     }

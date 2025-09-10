@@ -15,9 +15,18 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
+        // User::factory()->create([
+        //     'name' => 'Test User',
+        //     'email' => 'test@example.com',
+        // ]);
         User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+            'name' => 'beto',
+            'email' => 'beto@gmail.com',
+            'password' => bcrypt('123456789'), // Contraseña encriptada
         ]);
+
+        
+        $this->call(DiagramaSeeder::class);
+
     }
 }
