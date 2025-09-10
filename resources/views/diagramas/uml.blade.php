@@ -232,6 +232,7 @@
                     )
                 );
 
+
             // Link style
             function linkStyle() {
                 return {
@@ -316,6 +317,76 @@
                 linkCategoryProperty: 'relationship',
                 ...jsonInicial
             });
+            // Debajo de: myDiagram.model = new go.GraphLinksModel({...});
+
+            // Definir el menú contextual
+            var contextMenu = new go.Adornment("Vertical")
+                .add(
+                    new go.Panel("Auto", {
+                        margin: 2
+                    })
+                    .add(
+                        new go.Shape({
+                            fill: "white",
+                            stroke: "gray",
+                            width: 120,
+                            height: 30
+                        }),
+                        new go.TextBlock("Añadir Atributo", {
+                            margin: 5
+                        })
+                    )
+                    .set({
+                        click: function(e, obj) {
+                            var node = e.diagram.selection.first();
+                            if (node) {
+                                e.diagram.startTransaction("addAttribute");
+                                var newAttr = {
+                                    name: "newAttr",
+                                    type: "String",
+                                    visibility: "public"
+                                };
+                                var data = node.data;
+                                e.diagram.model.addArrayItem(data.properties, newAttr);
+                                e.diagram.commitTransaction("addAttribute");
+                            }
+                        }
+                    }),
+                    new go.Panel("Auto", {
+                        margin: 2
+                    })
+                    .add(
+                        new go.Shape({
+                            fill: "white",
+                            stroke: "gray",
+                            width: 120,
+                            height: 30
+                        }),
+                        new go.TextBlock("Añadir Operación", {
+                            margin: 5
+                        })
+                    )
+                    .set({
+                        click: function(e, obj) {
+                            var node = e.diagram.selection.first();
+                            if (node) {
+                                e.diagram.startTransaction("addOperation");
+                                var newOp = {
+                                    name: "newOperation",
+                                    parameters: [],
+                                    visibility: "public",
+                                    type: ""
+                                };
+                                var data = node.data;
+                                e.diagram.model.addArrayItem(data.methods, newOp);
+                                e.diagram.commitTransaction("addOperation");
+                            }
+                        }
+                    })
+                );
+
+            // Asignar el menú contextual al nodeTemplate
+            myDiagram.nodeTemplate.contextMenu = contextMenu;
 
             // Function to add a new class
             window.addNewClass = function() {
