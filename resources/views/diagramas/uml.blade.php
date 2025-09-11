@@ -97,10 +97,34 @@
                         return v;
                 }
             }
-
-            // Property template
+            // Reemplazar donde se define propertyTemplate
             var propertyTemplate = new go.Panel('Horizontal')
                 .add(
+                    // Botón para eliminar la propiedad
+                    go.GraphObject.build("Button", {
+                        margin: 2,
+                        width: 20,
+                        height: 20,
+                        click: function(e, button) {
+                            var panel = button.panel; // El panel Horizontal que contiene el botón
+                            var node = panel.part; // El nodo que contiene este panel
+                            var propertyData = panel.data; // Los datos de la propiedad
+
+                            e.diagram.startTransaction("removeProperty");
+                            var properties = node.data.properties;
+                            var index = properties.indexOf(propertyData);
+                            if (index !== -1) {
+                                e.diagram.model.removeArrayItem(properties, index);
+                            }
+                            e.diagram.commitTransaction("removeProperty");
+                        }
+                    })
+                    .add(
+                        new go.TextBlock("X", {
+                            font: "10pt sans-serif"
+                        })
+                    ),
+                    // Resto del template de propiedades
                     new go.TextBlock({
                         isMultiline: false,
                         editable: false,
@@ -127,9 +151,33 @@
                     .bind('text', 'default', s => s ? ' = ' + s : '')
                 );
 
-            // Method template
             var methodTemplate = new go.Panel('Horizontal')
                 .add(
+                    // Botón para eliminar el método
+                    go.GraphObject.build("Button", {
+                        margin: 2,
+                        width: 20,
+                        height: 20,
+                        click: function(e, button) {
+                            var panel = button.panel; // El panel Horizontal que contiene el botón
+                            var node = panel.part; // El nodo que contiene este panel
+                            var methodData = panel.data; // Los datos del método
+
+                            e.diagram.startTransaction("removeMethod");
+                            var methods = node.data.methods;
+                            var index = methods.indexOf(methodData);
+                            if (index !== -1) {
+                                e.diagram.model.removeArrayItem(methods, index);
+                            }
+                            e.diagram.commitTransaction("removeMethod");
+                        }
+                    })
+                    .add(
+                        new go.TextBlock("X", {
+                            font: "10pt sans-serif"
+                        })
+                    ),
+                    // Resto del template de métodos
                     new go.TextBlock({
                         isMultiline: false,
                         editable: false,
@@ -160,7 +208,6 @@
                     })
                     .bindTwoWay('text', 'type')
                 );
-
             // Node template
             myDiagram.nodeTemplate = new go.Node('Auto', {
                     locationSpot: go.Spot.Center,
