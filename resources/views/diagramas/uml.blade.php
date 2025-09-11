@@ -70,6 +70,10 @@
             // Access the diagram model passed from Laravel
             var jsonInicial = @json($jsonInicial);
 
+            var linkingMode = false;
+            var sourceNode = null;
+            var linkingTool = null;
+
             // Initialize the diagram
             var myDiagram = new go.Diagram('myDiagramDiv', {
                 'undoManager.isEnabled': true,
@@ -81,6 +85,7 @@
                     arrangement: go.TreeArrangement.Horizontal
                 })
             });
+
 
             // Convert visibility to symbols
             function convertVisibility(v) {
@@ -298,23 +303,92 @@
                     toEndSegmentLength: 0
                 };
             }
+            // Función para generar el output del diagrama
+            function generateDiagramOutput() {
+                // Obtener el modelo en formato JSON
+                var diagramJson = myDiagram.model.toJson();
 
-            // Link templates
-            myDiagram.linkTemplate = new go.Link({
-                    ...linkStyle(),
-                    isTreeLink: true
+                // Puedes hacer varias cosas con este JSON:
+
+                // 1. Mostrarlo en la consola (para debugging)
+                console.log("Diagrama actualizado:", JSON.parse(diagramJson));
+
+                // 2. Enviarlo a un endpoint de tu backend
+                // fetch('/guardar-diagrama', {
+                //     method: 'POST',
+                //     headers: {
+                //         'Content-Type': 'application/json',
+                //         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                //     },
+                //     body: diagramJson
+                // });
+
+                // 3. Guardarlo en un campo oculto del formulario (si estás en un formulario)
+                // document.getElementById('diagramData').value = diagramJson;
+
+                // 4. Mostrarlo en un elemento de la página (útil para debugging)
+                // document.getElementById('jsonOutput').textContent = JSON.stringify(JSON.parse(diagramJson), null, 2);
+            }
+            // REEMPLAZAR: todo myDiagram.linkTemplate por este bloque
+            myDiagram.linkTemplate =
+                new go.Link({
+                    routing: go.Link.AvoidsNodes,
+                    curve: go.Link.None,
+                    selectable: true,
+                    selectionAdorned: true
                 })
                 .add(
-                    new go.Shape(),
+                    // línea del enlace
                     new go.Shape({
-                        toArrow: 'Triangle',
-                        fill: 'white'
+                        strokeWidth: 1
                     })
+                    .bind(new go.Binding("strokeWidth", "strokeWidth")),
+
+                    // arrowhead para el extremo "to" — sólo visible si el linkData tiene toArrow no vacío
+                    new go.Shape({
+                        // no rellenar ni trazar por defecto (evita rectángulos visibles)
+                        fill: null,
+                        stroke: null
+                    })
+                    .bind(new go.Binding("toArrow")) // enlaza el tipo de flecha si existe
+                    .bind(new go.Binding("visible", "toArrow", function(v) {
+                        return !!v;
+                    })),
+
+                    // arrowhead para el extremo "from" — sólo visible si el linkData tiene fromArrow no vacío
+                    new go.Shape({
+                        fill: null,
+                        stroke: null
+                    })
+                    .bind(new go.Binding("fromArrow"))
+                    .bind(new go.Binding("visible", "fromArrow", function(v) {
+                        return !!v;
+                    })),
+
+                    // multiplicidad en origen (sin panel que dibuje fondo)
+                    new go.TextBlock({
+                        segmentIndex: 0,
+                        segmentFraction: 0,
+                        segmentOffset: new go.Point(-10, -10),
+                        background: null,
+                        editable: false
+                    }).bind(new go.Binding("text", "multiplicityFrom")),
+
+                    // multiplicidad en destino (sin panel que dibuje fondo)
+                    new go.TextBlock({
+                        segmentIndex: -1,
+                        segmentFraction: 1,
+                        segmentOffset: new go.Point(10, -10),
+                        background: null,
+                        editable: false
+                    }).bind(new go.Binding("text", "multiplicityTo"))
                 );
+
+
 
             myDiagram.linkTemplateMap.add('Association',
                 new go.Link(linkStyle())
-                .add(new go.Shape())
+                .add(new go.Shape()),
             );
 
             myDiagram.linkTemplateMap.add('Realization',
@@ -323,11 +397,9 @@
                     new go.Shape({
                         strokeDashArray: [3, 2]
                     }),
-                    new go.Shape({
-                        toArrow: 'Triangle',
-                        fill: 'white'
-                    })
+                    new go.Shape().bind(new go.Binding("toArrow")).bind(new go.Binding("fill"))
                 ));
+
 
             myDiagram.linkTemplateMap.add('Dependency',
                 new go.Link(linkStyle())
@@ -374,8 +446,14 @@
                 linkCategoryProperty: 'relationship',
                 ...jsonInicial
             });
-            // Debajo de: myDiagram.model = new go.GraphLinksModel({...});
 
+            // Agregar listener para cambios en el modelo
+            myDiagram.model.addChangedListener(function(e) {
+                // Esperar a que termine la transacción para evitar múltiples llamadas
+                if (e.isTransactionFinished) {
+                    generateDiagramOutput();
+                }
+            });
             // Definir el menú contextual
             var contextMenu = new go.Adornment("Vertical")
                 .add(
@@ -463,11 +541,147 @@
                                 e.diagram.commitTransaction("addStereotype");
                             }
                         }
+                    }),
+                    new go.Panel("Auto", {
+                        margin: 2
                     })
+                    .add(
+                        new go.Shape({
+                            fill: "white",
+                            stroke: "gray",
+                            width: 120,
+                            height: 30
+                        }),
+                        new go.TextBlock("Ctar. Asociacion", {
+                            margin: 5
+                        })
+                    )
+                    .set({
+                        click: function(e, obj) {
+                            var diagram = e.diagram;
+                            var fromNode = diagram.selection.first();
+                            if (!fromNode) return;
+
+                            var fromKey = fromNode.data.key;
+                            // indicador temporal (opcional): seleccionar la fuente para que el usuario la vea
+                            diagram.select(fromNode);
+
+                            // handler cuando el usuario haga click en otro nodo (destino)
+                            var assocHandler = function(ev) {
+                                var clickedPart = ev.subject.part;
+                                if (!clickedPart) return;
+                                // ignorar si es el mismo nodo
+                                if (clickedPart.data && clickedPart.data.key === fromKey) return;
+
+                                var toKey = clickedPart.data.key;
+
+                                // crear el link en el modelo (ajusta propiedades según tu modelo)
+                                diagram.startTransaction("createAssociation");
+                                // usa 'from' y 'to' si tu GraphLinksModel lo espera (ajustar si tu modelo usa otros nombres)
+                                diagram.model.addLinkData({
+                                    from: fromKey,
+                                    to: toKey,
+                                    relationship: "association",
+                                    multiplicityFrom: "", // dejar vacío o poner "1" / "0..*" etc.
+                                    multiplicityTo: ""
+                                });
+                                diagram.commitTransaction("createAssociation");
+
+                                // limpiar: remover listeners
+                                diagram.removeDiagramListener("ObjectSingleClicked", assocHandler);
+                                diagram.removeDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                            };
+
+                            // handler para cancelar si hace clic en fondo
+                            var bgCancelHandler = function(ev) {
+                                // limpiar sin crear nada
+                                diagram.removeDiagramListener("ObjectSingleClicked", assocHandler);
+                                diagram.removeDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                            };
+
+                            // registrar listeners temporales: esperar al click en la segunda clase o en el fondo
+                            diagram.addDiagramListener("ObjectSingleClicked", assocHandler);
+                            diagram.addDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                        }
+                    }),
+                    new go.Panel("Auto", {
+                        margin: 2
+                    })
+                    .add(
+                        new go.Shape({
+                            fill: "white",
+                            stroke: "gray",
+                            width: 120,
+                            height: 30
+                        }),
+                        new go.TextBlock("Crear Relación", {
+                            margin: 5
+                        })
+                    )
+                    .set({
+                        click: function(e, obj) {
+                            var fromNode = myDiagram.selection.first();
+                            if (!fromNode) return;
+
+                            var fromKey = fromNode.data.key;
+                            myDiagram.select(fromNode);
+
+                            var relHandler = function(ev) {
+                                var clickedPart = ev.subject.part;
+                                if (!clickedPart) return;
+                                if (clickedPart.data && clickedPart.data.key === fromKey) return;
+
+                                var toKey = clickedPart.data.key;
+
+                                myDiagram.startTransaction("createRelationSimple");
+                                myDiagram.model.addLinkData({
+                                    from: fromKey,
+                                    to: toKey,
+                                    relationship: "association",
+                                    multiplicityFrom: "1",
+                                    multiplicityTo: "0..*",
+                                    stereotype: ""
+                                });
+                                myDiagram.commitTransaction("createRelationSimple");
+
+                                myDiagram.removeDiagramListener("ObjectSingleClicked", relHandler);
+                                myDiagram.removeDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                            };
+
+                            var bgCancelHandler = function(ev) {
+                                myDiagram.removeDiagramListener("ObjectSingleClicked", relHandler);
+                                myDiagram.removeDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                            };
+
+                            myDiagram.addDiagramListener("ObjectSingleClicked", relHandler);
+                            myDiagram.addDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                        }
+                    }),
                 );
+
+            // --- AÑADIR/REEMPLAZAR: editar multiplicidades en doble clic usando myDiagram
+            myDiagram.addDiagramListener("ObjectDoubleClicked", function(e) {
+                var part = e.subject.part;
+                if (part instanceof go.Link) {
+                    var link = part;
+                    var currentFrom = link.data.multiplicityFrom || "";
+                    var currentTo = link.data.multiplicityTo || "";
+
+                    var newFrom = window.prompt("Multiplicidad (origen):", currentFrom);
+                    if (newFrom === null) return;
+                    var newTo = window.prompt("Multiplicidad (destino):", currentTo);
+                    if (newTo === null) return;
+
+                    myDiagram.startTransaction("editMultiplicities");
+                    myDiagram.model.setDataProperty(link.data, "multiplicityFrom", newFrom);
+                    myDiagram.model.setDataProperty(link.data, "multiplicityTo", newTo);
+                    myDiagram.commitTransaction("editMultiplicities");
+                }
+            });
 
             // Asignar el menú contextual al nodeTemplate
             myDiagram.nodeTemplate.contextMenu = contextMenu;
+
             // Function to add a new class
             window.addNewClass = function() {
                 myDiagram.startTransaction('addClass');
