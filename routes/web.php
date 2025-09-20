@@ -23,5 +23,5 @@ Route::middleware([
         Route::post('/analizar-imagen', [DiagramaController::class, 'procesarImagen'])
             ->name('analizar.imagen');
     });
-    Route::get('/uml', [DiagramaController::class, 'uml'])->name('uml.show');
 });
+Route::get('/uml', [DiagramaController::class, 'uml'])->name('uml.show');

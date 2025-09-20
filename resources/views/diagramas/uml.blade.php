@@ -303,7 +303,7 @@
                     toEndSegmentLength: 0
                 };
             }
-            // Función para generar el output del diagrama
+
             function generateDiagramOutput() {
                 // Obtener el modelo en formato JSON
                 var diagramJson = myDiagram.model.toJson();
@@ -552,58 +552,300 @@
                             width: 120,
                             height: 30
                         }),
-                        new go.TextBlock("Ctar. Asociacion", {
+                        new go.TextBlock("Crear Composición", {
                             margin: 5
                         })
                     )
                     .set({
                         click: function(e, obj) {
-                            var diagram = e.diagram;
-                            var fromNode = diagram.selection.first();
+                            var fromNode = myDiagram.selection.first();
                             if (!fromNode) return;
 
                             var fromKey = fromNode.data.key;
-                            // indicador temporal (opcional): seleccionar la fuente para que el usuario la vea
-                            diagram.select(fromNode);
+                            myDiagram.select(fromNode);
 
-                            // handler cuando el usuario haga click en otro nodo (destino)
-                            var assocHandler = function(ev) {
+                            var compHandler = function(ev) {
                                 var clickedPart = ev.subject.part;
                                 if (!clickedPart) return;
-                                // ignorar si es el mismo nodo
                                 if (clickedPart.data && clickedPart.data.key === fromKey) return;
 
                                 var toKey = clickedPart.data.key;
 
-                                // crear el link en el modelo (ajusta propiedades según tu modelo)
-                                diagram.startTransaction("createAssociation");
-                                // usa 'from' y 'to' si tu GraphLinksModel lo espera (ajustar si tu modelo usa otros nombres)
-                                diagram.model.addLinkData({
+                                myDiagram.startTransaction("createComposition");
+                                myDiagram.model.addLinkData({
                                     from: fromKey,
                                     to: toKey,
-                                    relationship: "association",
-                                    multiplicityFrom: "", // dejar vacío o poner "1" / "0..*" etc.
-                                    multiplicityTo: ""
+                                    relationship: "Composition",
+                                    multiplicityFrom: "1",
+                                    multiplicityTo: "0..*"
                                 });
-                                diagram.commitTransaction("createAssociation");
+                                myDiagram.commitTransaction("createComposition");
 
-                                // limpiar: remover listeners
-                                diagram.removeDiagramListener("ObjectSingleClicked", assocHandler);
-                                diagram.removeDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                                myDiagram.removeDiagramListener("ObjectSingleClicked", compHandler);
+                                myDiagram.removeDiagramListener("BackgroundSingleClicked", bgCancelHandler);
                             };
 
-                            // handler para cancelar si hace clic en fondo
                             var bgCancelHandler = function(ev) {
-                                // limpiar sin crear nada
-                                diagram.removeDiagramListener("ObjectSingleClicked", assocHandler);
-                                diagram.removeDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                                myDiagram.removeDiagramListener("ObjectSingleClicked", compHandler);
+                                myDiagram.removeDiagramListener("BackgroundSingleClicked", bgCancelHandler);
                             };
 
-                            // registrar listeners temporales: esperar al click en la segunda clase o en el fondo
-                            diagram.addDiagramListener("ObjectSingleClicked", assocHandler);
-                            diagram.addDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                            myDiagram.addDiagramListener("ObjectSingleClicked", compHandler);
+                            myDiagram.addDiagramListener("BackgroundSingleClicked", bgCancelHandler);
                         }
                     }),
+                    // Botón para Agregación
+                    new go.Panel("Auto", {
+                        margin: 2
+                    })
+                    .add(
+                        new go.Shape({
+                            fill: "white",
+                            stroke: "gray",
+                            width: 120,
+                            height: 30
+                        }),
+                        new go.TextBlock("Crear Agregación", {
+                            margin: 5
+                        })
+                    )
+                    .set({
+                        click: function(e, obj) {
+                            var fromNode = myDiagram.selection.first();
+                            if (!fromNode) return;
+
+                            var fromKey = fromNode.data.key;
+                            myDiagram.select(fromNode);
+
+                            var aggHandler = function(ev) {
+                                var clickedPart = ev.subject.part;
+                                if (!clickedPart) return;
+                                if (clickedPart.data && clickedPart.data.key === fromKey) return;
+
+                                var toKey = clickedPart.data.key;
+
+                                myDiagram.startTransaction("createAggregation");
+                                myDiagram.model.addLinkData({
+                                    from: fromKey,
+                                    to: toKey,
+                                    relationship: "Aggregation",
+                                    multiplicityFrom: "1",
+                                    multiplicityTo: "0..*"
+                                });
+                                myDiagram.commitTransaction("createAggregation");
+
+                                myDiagram.removeDiagramListener("ObjectSingleClicked", aggHandler);
+                                myDiagram.removeDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                            };
+
+                            var bgCancelHandler = function(ev) {
+                                myDiagram.removeDiagramListener("ObjectSingleClicked", aggHandler);
+                                myDiagram.removeDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                            };
+
+                            myDiagram.addDiagramListener("ObjectSingleClicked", aggHandler);
+                            myDiagram.addDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                        }
+                    }),
+
+                    // Botón para Dependencia
+                    new go.Panel("Auto", {
+                        margin: 2
+                    })
+                    .add(
+                        new go.Shape({
+                            fill: "white",
+                            stroke: "gray",
+                            width: 120,
+                            height: 30
+                        }),
+                        new go.TextBlock("Crear Dependencia", {
+                            margin: 5
+                        })
+                    )
+                    .set({
+                        click: function(e, obj) {
+                            var fromNode = myDiagram.selection.first();
+                            if (!fromNode) return;
+
+                            var fromKey = fromNode.data.key;
+                            myDiagram.select(fromNode);
+
+                            var depHandler = function(ev) {
+                                var clickedPart = ev.subject.part;
+                                if (!clickedPart) return;
+                                if (clickedPart.data && clickedPart.data.key === fromKey) return;
+
+                                var toKey = clickedPart.data.key;
+
+                                myDiagram.startTransaction("createDependency");
+                                myDiagram.model.addLinkData({
+                                    from: fromKey,
+                                    to: toKey,
+                                    relationship: "Dependency",
+                                    multiplicityFrom: "",
+                                    multiplicityTo: ""
+                                });
+                                myDiagram.commitTransaction("createDependency");
+
+                                myDiagram.removeDiagramListener("ObjectSingleClicked", depHandler);
+                                myDiagram.removeDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                            };
+
+                            var bgCancelHandler = function(ev) {
+                                myDiagram.removeDiagramListener("ObjectSingleClicked", depHandler);
+                                myDiagram.removeDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                            };
+
+                            myDiagram.addDiagramListener("ObjectSingleClicked", depHandler);
+                            myDiagram.addDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                        }
+                    }),
+                   new go.Panel("Auto", {
+    margin: 2
+})
+.add(
+    new go.Shape({
+        fill: "white",
+        stroke: "gray",
+        width: 120,
+        height: 30
+    }),
+    new go.TextBlock("Crear Tabla Intermedia", {
+        margin: 5
+    })
+)
+.set({
+    click: function(e, obj) {
+        var firstClass = myDiagram.selection.first();
+        if (!firstClass) return;
+
+        var firstKey = firstClass.data.key;
+        var firstLoc = firstClass.location;
+        myDiagram.select(firstClass);
+
+        var secondClassHandler = function(ev) {
+            var clickedPart = ev.subject.part;
+            if (!clickedPart || !(clickedPart instanceof go.Node)) return;
+            if (clickedPart.data.key === firstKey) return;
+
+            var secondKey = clickedPart.data.key;
+            var secondLoc = clickedPart.location;
+            var diagram = ev.diagram;
+
+            diagram.startTransaction("createIntermediateTable");
+
+            // Calcular posición intermedia
+            var midX = (firstLoc.x + secondLoc.x) / 2;
+            var midY = (firstLoc.y + secondLoc.y) / 2;
+
+            // Crear la clase intermedia
+            var intermediateClassKey = diagram.model.nodeDataArray.length + 1;
+            var intermediateClass = {
+                key: intermediateClassKey,
+                name: firstClass.data.name + "_" + clickedPart.data.name,
+                properties: [],
+                methods: [],
+                loc: go.Point.stringify(new go.Point(midX, midY))
+            };
+            diagram.model.addNodeData(intermediateClass);
+
+            // Crear asociaciones en forma de T
+            diagram.model.addLinkData({
+                from: firstKey,
+                to: intermediateClassKey,
+                relationship: "Association",
+                multiplicityFrom: "1",
+                multiplicityTo: "1"
+            });
+
+            diagram.model.addLinkData({
+                from: secondKey,
+                to: intermediateClassKey,
+                relationship: "Association",
+                multiplicityFrom: "1",
+                multiplicityTo: "1"
+            });
+
+            diagram.commitTransaction("createIntermediateTable");
+
+            // Remover listeners
+            diagram.removeDiagramListener("ObjectSingleClicked", secondClassHandler);
+            diagram.removeDiagramListener("BackgroundSingleClicked", cancelHandler);
+        };
+
+        var cancelHandler = function(ev) {
+            var diagram = ev.diagram;
+            diagram.removeDiagramListener("ObjectSingleClicked", secondClassHandler);
+            diagram.removeDiagramListener("BackgroundSingleClicked", cancelHandler);
+        };
+
+        myDiagram.addDiagramListener("ObjectSingleClicked", secondClassHandler);
+        myDiagram.addDiagramListener("BackgroundSingleClicked", cancelHandler);
+    }
+}),
+                    // new go.Panel("Auto", {
+                    //     margin: 2
+                    // })
+                    // .add(
+                    //     new go.Shape({
+                    //         fill: "white",
+                    //         stroke: "gray",
+                    //         width: 120,
+                    //         height: 30
+                    //     }),
+                    //     new go.TextBlock("Ctar. Asociacion", {
+                    //         margin: 5
+                    //     })
+                    // )
+                    // .set({
+                    //     click: function(e, obj) {
+                    //         var diagram = e.diagram;
+                    //         var fromNode = diagram.selection.first();
+                    //         if (!fromNode) return;
+
+                    //         var fromKey = fromNode.data.key;
+                    //         // indicador temporal (opcional): seleccionar la fuente para que el usuario la vea
+                    //         diagram.select(fromNode);
+
+                    //         // handler cuando el usuario haga click en otro nodo (destino)
+                    //         var assocHandler = function(ev) {
+                    //             var clickedPart = ev.subject.part;
+                    //             if (!clickedPart) return;
+                    //             // ignorar si es el mismo nodo
+                    //             if (clickedPart.data && clickedPart.data.key === fromKey) return;
+
+                    //             var toKey = clickedPart.data.key;
+
+                    //             // crear el link en el modelo (ajusta propiedades según tu modelo)
+                    //             diagram.startTransaction("createAssociation");
+                    //             // usa 'from' y 'to' si tu GraphLinksModel lo espera (ajustar si tu modelo usa otros nombres)
+                    //             diagram.model.addLinkData({
+                    //                 from: fromKey,
+                    //                 to: toKey,
+                    //                 relationship: "association",
+                    //                 multiplicityFrom: "", // dejar vacío o poner "1" / "0..*" etc.
+                    //                 multiplicityTo: ""
+                    //             });
+                    //             diagram.commitTransaction("createAssociation");
+
+                    //             // limpiar: remover listeners
+                    //             diagram.removeDiagramListener("ObjectSingleClicked", assocHandler);
+                    //             diagram.removeDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                    //         };
+
+                    //         // handler para cancelar si hace clic en fondo
+                    //         var bgCancelHandler = function(ev) {
+                    //             // limpiar sin crear nada
+                    //             diagram.removeDiagramListener("ObjectSingleClicked", assocHandler);
+                    //             diagram.removeDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                    //         };
+
+                    //         // registrar listeners temporales: esperar al click en la segunda clase o en el fondo
+                    //         diagram.addDiagramListener("ObjectSingleClicked", assocHandler);
+                    //         diagram.addDiagramListener("BackgroundSingleClicked", bgCancelHandler);
+                    //     }
+                    // }),
                     new go.Panel("Auto", {
                         margin: 2
                     })
