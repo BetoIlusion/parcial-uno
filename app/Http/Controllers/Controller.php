@@ -8,6 +8,7 @@ abstract class Controller
 {
     public function index(){
         $diagrama = Diagrama::all();
+        
         return view('dashboard1',
         [
             'diagrama' => $diagrama

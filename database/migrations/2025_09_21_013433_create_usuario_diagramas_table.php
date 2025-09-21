@@ -11,11 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('diagramas', function (Blueprint $table) {
+        Schema::create('usuario_diagramas', function (Blueprint $table) {
             $table->id();
-            $table->integer('nombre');
-            $table->string('descripcion');
-            $table->text('contenido')->nullable();
+            $table->foreignId('user_id')->constrained('users');
+            $table->foreignId('diagrama_id')->constrained('diagramas');
+            $table->string('actividad')->default('sin especificacion');
+            $table->string('tipo_usuario')->default('creador');
             $table->boolean('estado')->default(true);
             $table->timestamps();
         });
@@ -26,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('diagramas');
+        Schema::dropIfExists('usuario_diagramas');
     }
 };

@@ -11,12 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('diagramas', function (Blueprint $table) {
+        Schema::create('diagrama_reportes', function (Blueprint $table) {
             $table->id();
-            $table->integer('nombre');
-            $table->string('descripcion');
-            $table->text('contenido')->nullable();
-            $table->boolean('estado')->default(true);
+            $table->foreignId('user_id')->constrained('users');
+            $table->foreignId('diagrama_id')->constrained('diagramas');
+            $table->json('diagrama_json');
             $table->timestamps();
         });
     }
@@ -26,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('diagramas');
+        Schema::dropIfExists('diagrama_reportes');
     }
 };

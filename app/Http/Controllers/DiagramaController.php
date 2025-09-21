@@ -8,6 +8,9 @@ use App\Models\Diagrama;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Json;
+use App\Models\DiagramaReporte;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 
 class DiagramaController extends Controller
@@ -25,29 +28,24 @@ class DiagramaController extends Controller
                 'nombre' => 'required|string|max:255|unique:diagramas,nombre',
                 'descripcion' => 'nullable|string|max:1000',
             ],
-            // [
-            //     'nombre.required' => 'El nombre es requerido',
-            //     'nombre.string' => 'El nombre debe ser una cadena de caracteres',
-            //     'nombre.max' => 'El nombre no puede tener más de 255 caracteres',
-            //     'nombre.unique' => 'El nombre ya está en uso',
-            //     'descripcion.string' => 'La descripción debe ser una cadena de caracteres',
-            //     'descripcion.max' => 'La descripción no puede tener más de 1000 caracteres'
-            // ]
         );
-        $diagrama = Diagrama::create([
-            'nombre' => $validated['nombre'],
-            'descripcion' => $validated['descripcion'] ?? '',
-            'contenido' => json_encode(Diagrama::diagramaInicial(), JSON_PRETTY_PRINT)
-        ]);
-        return redirect()->route('diagramas.show', $diagrama->id)
-            ->with('success', 'Diagrama creado correctamente');
+        $diagrama = Diagrama::crear(
+            $validated['nombre'],
+            $validated['descripcion']
+        );
+        DiagramaReporte::crear($diagrama->contenido, $diagrama->id);
+        
+        return Redirect::route('diagramas.show', compact('diagrama'));
     }
     public function show(Diagrama $diagrama)
     {
         // Decodificamos el JSON para pasarlo al JS
-        $contenido = json_decode($diagrama->contenido, true);
-
-        return view('diagramas.pizarra', compact('diagrama', 'contenido'));
+        $diagramaId = $diagrama->id;
+        $ultimoReporte = DiagramaReporte::query()
+            ->where('diagrama_id', $diagrama->id)
+            ->latest()->first();
+        $jsonInicial = json_decode($ultimoReporte->diagrama_json, true);
+        return view('diagramas.uml', compact('jsonInicial', 'diagramaId'));
     }
     public function updateContenido(Request $request, Diagrama $diagrama)
     {
@@ -76,5 +74,23 @@ class DiagramaController extends Controller
         return view('diagramas.uml', [
             'jsonInicial' => $jsonInicial
         ]);
+    }
+    public function diagramaReporte(Request $request)
+    {
+        Log::info('JSON recibido:', $request->all());
+        $diagramaJson = $request->input('diagrama_json');
+        $diagramaId = $request->input('diagrama_id');
+
+
+        return response()->json([
+            'status' => 'ok',
+            'data'   => $request->all()
+        ], 200);
+    }
+
+    public function destroy(Diagrama $diagrama)
+    {
+        $diagrama->delete();
+        return Redirect::route('dashboard')->with('success', 'Diagrama eliminado correctamente.');
     }
 }

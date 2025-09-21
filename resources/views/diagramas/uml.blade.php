@@ -3,6 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UML Class Diagram</title>
     <!-- Include GoJS library -->
@@ -69,6 +71,7 @@
         function init() {
             // Access the diagram model passed from Laravel
             var jsonInicial = @json($jsonInicial);
+            var diagramaId = @json($diagramaId);
 
             var linkingMode = false;
             var sourceNode = null;
@@ -305,30 +308,62 @@
             }
 
             function generateDiagramOutput() {
-                // Obtener el modelo en formato JSON
-                var diagramJson = myDiagram.model.toJson();
+                // if (!window.myDiagram || !myDiagram.model) {
+                //     console.error('Error: el diagrama no está inicializado');
+                //     return;
+                // }
 
-                // Puedes hacer varias cosas con este JSON:
+                var currentDiagramJson = myDiagram.model.toJson();
 
-                // 1. Mostrarlo en la consola (para debugging)
-                console.log("Diagrama actualizado:", JSON.parse(diagramJson));
+                try {
+                    var parsedDiagram;
+                    try {
+                        parsedDiagram = JSON.parse(currentDiagramJson);
+                    } catch (parseError) {
+                        console.error('Error en el formato del diagrama:', parseError.message);
+                        return;
+                    }
 
-                // 2. Enviarlo a un endpoint de tu backend
-                // fetch('/guardar-diagrama', {
-                //     method: 'POST',
-                //     headers: {
-                //         'Content-Type': 'application/json',
-                //         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                //     },
-                //     body: diagramJson
-                // });
+                    var csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+                    var csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : null;
+                    if (!csrfToken) {
+                        console.error('No se encontró el token CSRF');
+                        return;
+                    }
 
-                // 3. Guardarlo en un campo oculto del formulario (si estás en un formulario)
-                // document.getElementById('diagramData').value = diagramJson;
+                    fetch("{{ route('diagrama-reporte.create') }}", {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken
+                            },
+                            body: JSON.stringify({
+                                diagramData: parsedDiagram,
+                                diagramaId: diagramaId
+                            })
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.text().then(t => {
+                                    throw new Error('HTTP ' + response.status + ' - ' + t);
+                                });
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log('Envío realizado. Verifica el log en el servidor.');
+                        })
+                        .catch(error => {
+                            console.error('Error al enviar el diagrama:', error.message);
+                        });
 
-                // 4. Mostrarlo en un elemento de la página (útil para debugging)
-                // document.getElementById('jsonOutput').textContent = JSON.stringify(JSON.parse(diagramJson), null, 2);
-            }
+                } catch (error) {
+                    console.error('Error inesperado:', error.message);
+                }
+            };
+
+
             // REEMPLAZAR: todo myDiagram.linkTemplate por este bloque
             myDiagram.linkTemplate =
                 new go.Link({
@@ -701,89 +736,89 @@
                             myDiagram.addDiagramListener("BackgroundSingleClicked", bgCancelHandler);
                         }
                     }),
-                   new go.Panel("Auto", {
-    margin: 2
-})
-.add(
-    new go.Shape({
-        fill: "white",
-        stroke: "gray",
-        width: 120,
-        height: 30
-    }),
-    new go.TextBlock("Crear Tabla Intermedia", {
-        margin: 5
-    })
-)
-.set({
-    click: function(e, obj) {
-        var firstClass = myDiagram.selection.first();
-        if (!firstClass) return;
+                    new go.Panel("Auto", {
+                        margin: 2
+                    })
+                    .add(
+                        new go.Shape({
+                            fill: "white",
+                            stroke: "gray",
+                            width: 120,
+                            height: 30
+                        }),
+                        new go.TextBlock("Crear Tabla Intermedia", {
+                            margin: 5
+                        })
+                    )
+                    .set({
+                        click: function(e, obj) {
+                            var firstClass = myDiagram.selection.first();
+                            if (!firstClass) return;
 
-        var firstKey = firstClass.data.key;
-        var firstLoc = firstClass.location;
-        myDiagram.select(firstClass);
+                            var firstKey = firstClass.data.key;
+                            var firstLoc = firstClass.location;
+                            myDiagram.select(firstClass);
 
-        var secondClassHandler = function(ev) {
-            var clickedPart = ev.subject.part;
-            if (!clickedPart || !(clickedPart instanceof go.Node)) return;
-            if (clickedPart.data.key === firstKey) return;
+                            var secondClassHandler = function(ev) {
+                                var clickedPart = ev.subject.part;
+                                if (!clickedPart || !(clickedPart instanceof go.Node)) return;
+                                if (clickedPart.data.key === firstKey) return;
 
-            var secondKey = clickedPart.data.key;
-            var secondLoc = clickedPart.location;
-            var diagram = ev.diagram;
+                                var secondKey = clickedPart.data.key;
+                                var secondLoc = clickedPart.location;
+                                var diagram = ev.diagram;
 
-            diagram.startTransaction("createIntermediateTable");
+                                diagram.startTransaction("createIntermediateTable");
 
-            // Calcular posición intermedia
-            var midX = (firstLoc.x + secondLoc.x) / 2;
-            var midY = (firstLoc.y + secondLoc.y) / 2;
+                                // Calcular posición intermedia
+                                var midX = (firstLoc.x + secondLoc.x) / 2;
+                                var midY = (firstLoc.y + secondLoc.y) / 2;
 
-            // Crear la clase intermedia
-            var intermediateClassKey = diagram.model.nodeDataArray.length + 1;
-            var intermediateClass = {
-                key: intermediateClassKey,
-                name: firstClass.data.name + "_" + clickedPart.data.name,
-                properties: [],
-                methods: [],
-                loc: go.Point.stringify(new go.Point(midX, midY))
-            };
-            diagram.model.addNodeData(intermediateClass);
+                                // Crear la clase intermedia
+                                var intermediateClassKey = diagram.model.nodeDataArray.length + 1;
+                                var intermediateClass = {
+                                    key: intermediateClassKey,
+                                    name: firstClass.data.name + "_" + clickedPart.data.name,
+                                    properties: [],
+                                    methods: [],
+                                    loc: go.Point.stringify(new go.Point(midX, midY))
+                                };
+                                diagram.model.addNodeData(intermediateClass);
 
-            // Crear asociaciones en forma de T
-            diagram.model.addLinkData({
-                from: firstKey,
-                to: intermediateClassKey,
-                relationship: "Association",
-                multiplicityFrom: "1",
-                multiplicityTo: "1"
-            });
+                                // Crear asociaciones en forma de T
+                                diagram.model.addLinkData({
+                                    from: firstKey,
+                                    to: intermediateClassKey,
+                                    relationship: "Association",
+                                    multiplicityFrom: "1",
+                                    multiplicityTo: "1"
+                                });
 
-            diagram.model.addLinkData({
-                from: secondKey,
-                to: intermediateClassKey,
-                relationship: "Association",
-                multiplicityFrom: "1",
-                multiplicityTo: "1"
-            });
+                                diagram.model.addLinkData({
+                                    from: secondKey,
+                                    to: intermediateClassKey,
+                                    relationship: "Association",
+                                    multiplicityFrom: "1",
+                                    multiplicityTo: "1"
+                                });
 
-            diagram.commitTransaction("createIntermediateTable");
+                                diagram.commitTransaction("createIntermediateTable");
 
-            // Remover listeners
-            diagram.removeDiagramListener("ObjectSingleClicked", secondClassHandler);
-            diagram.removeDiagramListener("BackgroundSingleClicked", cancelHandler);
-        };
+                                // Remover listeners
+                                diagram.removeDiagramListener("ObjectSingleClicked", secondClassHandler);
+                                diagram.removeDiagramListener("BackgroundSingleClicked", cancelHandler);
+                            };
 
-        var cancelHandler = function(ev) {
-            var diagram = ev.diagram;
-            diagram.removeDiagramListener("ObjectSingleClicked", secondClassHandler);
-            diagram.removeDiagramListener("BackgroundSingleClicked", cancelHandler);
-        };
+                            var cancelHandler = function(ev) {
+                                var diagram = ev.diagram;
+                                diagram.removeDiagramListener("ObjectSingleClicked", secondClassHandler);
+                                diagram.removeDiagramListener("BackgroundSingleClicked", cancelHandler);
+                            };
 
-        myDiagram.addDiagramListener("ObjectSingleClicked", secondClassHandler);
-        myDiagram.addDiagramListener("BackgroundSingleClicked", cancelHandler);
-    }
-}),
+                            myDiagram.addDiagramListener("ObjectSingleClicked", secondClassHandler);
+                            myDiagram.addDiagramListener("BackgroundSingleClicked", cancelHandler);
+                        }
+                    }),
                     // new go.Panel("Auto", {
                     //     margin: 2
                     // })
