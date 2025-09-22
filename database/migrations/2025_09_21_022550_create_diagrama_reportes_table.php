@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained('users');
             $table->foreignId('diagrama_id')->constrained('diagramas');
-            $table->json('diagrama_json');
+            $table->text('contenido')->nullable();
             $table->timestamps();
         });
     }

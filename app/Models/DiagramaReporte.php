@@ -11,8 +11,7 @@ class DiagramaReporte extends Model
     protected $fillable = [
         'user_id',
         'diagrama_id',
-        'diagrama_json',
-        'ultima_modificacion',
+        'contenido',
     ];
 
     public function user()
@@ -24,21 +23,15 @@ class DiagramaReporte extends Model
     {
         return $this->belongsTo(Diagrama::class);
     }
-    public static function crear($diagramaJson, $diagramaId)
+    public static function crear($userId, $diagramaId, $diagramaData)
     {
-        $user = Auth::user();
-        if (!$user) {
-            throw new \Exception('Usuario no autenticado');
-        }
-
         try {
             return static::create([
-                'user_id' => $user->id,
+                'user_id' => $userId,
                 'diagrama_id' => $diagramaId,
-                'diagrama_json' => json_encode($diagramaJson, JSON_PRETTY_PRINT),
+                'contenido' => is_array($diagramaData) ? json_encode($diagramaData, JSON_PRETTY_PRINT) : $diagramaData,
             ]);
         } catch (\Exception $e) {
-            // Manejar la excepción, por ejemplo, loggearla o relanzarla
             throw new \Exception('Error al crear el reporte del diagrama: ' . $e->getMessage());
         }
     }

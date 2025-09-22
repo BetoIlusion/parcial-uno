@@ -77,21 +77,4 @@ class Diagrama extends Model
             ]
         ];
     }
-    public static function crear($nombre, $descripcion)
-    {
-
-        $user = Auth::user();
-        if (!$user) {
-            throw new \Exception('Usuario no autenticado');
-        }
-
-        $diagrama = static::create([
-            'nombre' => $nombre,
-            'descripcion' => $descripcion,
-            'contenido' => json_encode(static::diagramaInicial(), JSON_PRETTY_PRINT)
-        ]);
-
-        UsuarioDiagrama::crearRelacion($user->id, $diagrama->id, 'creando diagrama', 'creador');
-        return $diagrama;
-    }
 }

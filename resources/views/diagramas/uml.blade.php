@@ -308,10 +308,6 @@
             }
 
             function generateDiagramOutput() {
-                // if (!window.myDiagram || !myDiagram.model) {
-                //     console.error('Error: el diagrama no está inicializado');
-                //     return;
-                // }
 
                 var currentDiagramJson = myDiagram.model.toJson();
 
