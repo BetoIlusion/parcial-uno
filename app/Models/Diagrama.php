@@ -41,38 +41,35 @@ class Diagrama extends Model
     public static function diagramaInicial(): array
     {
         return [
-            'cells' => [
+            "class" => "GraphLinksModel",
+            "copiesArrays" => true,
+            "copiesArrayObjects" => true,
+            "linkCategoryProperty" => "relationship",
+            "nodeDataArray" => [
                 [
-                    'type' => 'standard.HeaderedRectangle',
-                    'position' => ['x' => 100, 'y' => 100],
-                    'size' => ['width' => 160, 'height' => 100],
-                    'attrs' => [
-                        'header' => ['label' => ['text' => 'Class1']],
-                        'body' => ['label' => ['text' => '+ atributo: Tipo']]
+                    "key" => "NewClass",
+                    "name" => "NewClass",
+                    "properties" => [
+                        ["name" => "exampleProperty", "type" => "String", "visibility" => "public"]
                     ],
-                    'id' => 'class1'
-                ],
-                [
-                    'type' => 'standard.HeaderedRectangle',
-                    'position' => ['x' => 400, 'y' => 100],
-                    'size' => ['width' => 160, 'height' => 100],
-                    'attrs' => [
-                        'header' => ['label' => ['text' => 'Class2']],
-                        'body' => ['label' => ['text' => '+ atributo: Tipo']]
-                    ],
-                    'id' => 'class2'
-                ],
-                [
-                    'type' => 'standard.Link',
-                    'source' => ['id' => 'class1'],
-                    'target' => ['id' => 'class2'],
-                    'attrs' => [
-                        'line' => [
-                            'stroke' => '#000',
-                            'strokeWidth' => 2,
-                            'targetMarker' => ['type' => 'path', 'd' => 'M 10 -5 0 0 10 5 z']
-                        ]
+                    "methods" => [
+                        ["name" => "exampleMethod", "parameters" => [["name" => "param", "type" => "int"]], "visibility" => "public"]
                     ]
+                ],
+                [
+                    "key" => "NewClass2",
+                    "name" => "NewClass2",
+                    "properties" => [],
+                    "methods" => []
+                ]
+            ],
+            "linkDataArray" => [
+                [
+                    "from" => "NewClass",
+                    "to" => "NewClass2",
+                    "relationship" => "Association Simple",
+                    "fromCardinality" => "1..1",
+                    "toCardinality" => "1..*"
                 ]
             ]
         ];

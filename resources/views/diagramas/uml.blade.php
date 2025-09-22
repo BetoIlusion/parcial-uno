@@ -222,6 +222,7 @@
                     fromSpot: go.Spot.AllSides,
                     toSpot: go.Spot.AllSides
                 })
+                .bind(new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify))
                 .add(
                     new go.Shape({
                         fill: 'lightyellow'
@@ -308,59 +309,44 @@
             }
 
             function generateDiagramOutput() {
-
                 var currentDiagramJson = myDiagram.model.toJson();
 
-                try {
-                    var parsedDiagram;
-                    try {
-                        parsedDiagram = JSON.parse(currentDiagramJson);
-                    } catch (parseError) {
-                        console.error('Error en el formato del diagrama:', parseError.message);
-                        return;
-                    }
-
-                    var csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
-                    var csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : null;
-                    if (!csrfToken) {
-                        console.error('No se encontró el token CSRF');
-                        return;
-                    }
-
-                    fetch("{{ route('diagrama-reporte.create') }}", {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': csrfToken
-                            },
-                            body: JSON.stringify({
-                                diagramData: parsedDiagram,
-                                diagramaId: diagramaId
-                            })
-                        })
-                        .then(response => {
-                            if (!response.ok) {
-                                return response.text().then(t => {
-                                    throw new Error('HTTP ' + response.status + ' - ' + t);
-                                });
-                            }
-                            return response.json();
-                        })
-                        .then(data => {
-                            console.log('Envío realizado. Verifica el log en el servidor.');
-                        })
-                        .catch(error => {
-                            console.error('Error al enviar el diagrama:', error.message);
-                        });
-
-                } catch (error) {
-                    console.error('Error inesperado:', error.message);
+                var csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+                var csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : null;
+                if (!csrfToken) {
+                    console.error('No se encontró el token CSRF');
+                    return;
                 }
+
+                fetch("{{ route('diagrama-reporte.create') }}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken
+                        },
+                        body: JSON.stringify({
+                            diagramData: currentDiagramJson,
+                            diagramaId: diagramaId
+                        })
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.text().then(text => {
+                                throw new Error('HTTP ' + response.status + ' - ' + text);
+                            });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('Diagrama guardado correctamente.');
+                    })
+                    .catch(error => {
+                        console.error('Error al guardar el diagrama:', error.message);
+                    });
             };
 
 
-            // REEMPLAZAR: todo myDiagram.linkTemplate por este bloque
             myDiagram.linkTemplate =
                 new go.Link({
                     routing: go.Link.AvoidsNodes,
@@ -470,14 +456,21 @@
                     })
                 ));
 
-            // Set the model from Laravel
-            myDiagram.model = new go.GraphLinksModel({
-                copiesArrays: true,
-                copiesArrayObjects: true,
-                linkCategoryProperty: 'relationship',
-                ...jsonInicial
-            });
-
+            // Cargar el modelo desde el JSON inicial
+            myDiagram.model = go.GraphLinksModel.fromJson(jsonInicial);
+            // Asegurar configuraciones necesarias
+            myDiagram.model.copiesArrays = true;
+            myDiagram.model.copiesArrayObjects = true;
+            myDiagram.model.linkCategoryProperty = 'relationship';
+            // myDiagram.model = go.Model.fromJson(jsonInicial);
+            // // Set the model from Laravel
+            // myDiagram.model = new go.GraphLinksModel({
+            //     copiesArrays: true,
+            //     copiesArrayObjects: true,
+            //     linkCategoryProperty: 'relationship',
+            //     ...jsonInicial
+            // });
+            // REEMPLAZAR: todo myDiagram.linkTemplate por este bloque
             // Agregar listener para cambios en el modelo
             myDiagram.model.addChangedListener(function(e) {
                 // Esperar a que termine la transacción para evitar múltiples llamadas
@@ -931,6 +924,7 @@
                         }
                     }),
                 );
+            myDiagram.nodeTemplate.contextMenu = contextMenu;
 
             // --- AÑADIR/REEMPLAZAR: editar multiplicidades en doble clic usando myDiagram
             myDiagram.addDiagramListener("ObjectDoubleClicked", function(e) {
@@ -952,8 +946,7 @@
                 }
             });
 
-            // Asignar el menú contextual al nodeTemplate
-            myDiagram.nodeTemplate.contextMenu = contextMenu;
+
 
             // Function to add a new class
             window.addNewClass = function() {
@@ -967,6 +960,8 @@
                 myDiagram.model.addNodeData(newClass);
                 myDiagram.commitTransaction('addClass');
             };
+            // Añadir un rebuild para refrescar nodos existentes (esto fuerza la aplicación del template a nodos iniciales)
+            myDiagram.rebuildParts();
         }
 
         // Initialize when DOM is loaded
