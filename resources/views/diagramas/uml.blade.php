@@ -61,6 +61,7 @@
         <div id="leftPanel">
             <div id="buttonPanel">
                 <button onclick="addNewClass()">Add New Class</button>
+                {{-- <button onclick="location.href='{{ route('diagramas.exportarSpringBoot', ['id' => $id]) }}'">Export to Spring Boot</button> --}}
             </div>
             <div id="myDiagramDiv"></div>
         </div>
@@ -222,7 +223,7 @@
                     fromSpot: go.Spot.AllSides,
                     toSpot: go.Spot.AllSides
                 })
-                .bind(new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify))
+                //.bind(new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify))
                 .add(
                     new go.Shape({
                         fill: 'lightyellow'
@@ -309,42 +310,56 @@
             }
 
             function generateDiagramOutput() {
-                var currentDiagramJson = myDiagram.model.toJson();
+    try {
+        var currentDiagramJson = myDiagram.model.toJson();
+        
+        console.log('Enviando diagrama...', {
+            diagramaId: diagramaId,
+            dataLength: currentDiagramJson.length
+        });
 
-                var csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
-                var csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : null;
-                if (!csrfToken) {
-                    console.error('No se encontró el token CSRF');
-                    return;
-                }
+        var csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+        var csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : null;
+        
+        if (!csrfToken) {
+            console.error('No se encontró el token CSRF');
+            return;
+        }
 
-                fetch("{{ route('diagrama-reporte.create') }}", {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken
-                        },
-                        body: JSON.stringify({
-                            diagramData: currentDiagramJson,
-                            diagramaId: diagramaId
-                        })
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            return response.text().then(text => {
-                                throw new Error('HTTP ' + response.status + ' - ' + text);
-                            });
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('Diagrama guardado correctamente.');
-                    })
-                    .catch(error => {
-                        console.error('Error al guardar el diagrama:', error.message);
-                    });
-            };
+        fetch("{{ route('diagrama-reporte.create') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify({
+                diagramData: currentDiagramJson,
+                diagramaId: diagramaId
+            })
+        })
+        .then(response => {
+            console.log('Respuesta recibida:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                return response.text().then(text => {
+                    console.error('Error detallado:', text);
+                    throw new Error('HTTP ' + response.status + ' - ' + text);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Diagrama guardado correctamente:', data);
+        })
+        .catch(error => {
+            console.error('Error completo al guardar:', error);
+        });
+        
+    } catch (error) {
+        console.error('Error en generateDiagramOutput:', error);
+    }
+};
 
 
             myDiagram.linkTemplate =

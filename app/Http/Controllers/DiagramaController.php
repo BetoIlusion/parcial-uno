@@ -11,7 +11,12 @@ use App\Models\DiagramaReporte;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Diagrama;
+use ZipArchive;
 use App\Models\UsuarioDiagrama;
+use App\Models\User;
+use Illuminate\Support\Facades\File;
+
+
 
 class DiagramaController extends Controller
 {
@@ -75,18 +80,48 @@ class DiagramaController extends Controller
             'jsonInicial' => $jsonInicial
         ]);
     }
+    // En DiagramaController.php - REEMPLAZA la función diagramaReporte
     public function diagramaReporte(Request $request)
     {
-        $user = Auth::user();
-        Log::info('JSON recibido:', $request->all());
-        $diagramaJson = $request->input('diagramData');
-        $diagramaId = $request->input('diagramaId');
-        DiagramaReporte::crear($user->id, $diagramaId, $diagramaJson);
-    }
+        try {
+            $user = Auth::user();
+            Log::info('JSON recibido:', $request->all());
 
-    public function destroy(Diagrama $diagrama)
-    {
-        $diagrama->delete();
-        return Redirect::route('dashboard')->with('success', 'Diagrama eliminado correctamente.');
+            $diagramaJson = $request->input('diagramData');
+            $diagramaId = $request->input('diagramaId');
+
+            // Validar que los datos existen
+            if (!$diagramaJson || !$diagramaId) {
+                return response()->json([
+                    'error' => 'Datos incompletos'
+                ], 400);
+            }
+
+            // Decodificar si es necesario
+            if (is_string($diagramaJson)) {
+                $diagramaData = json_decode($diagramaJson, true);
+            } else {
+                $diagramaData = $diagramaJson;
+            }
+
+            DiagramaReporte::crear($user->id, $diagramaId, $diagramaData);
+
+            return response()->json([
+                'message' => 'Diagrama guardado correctamente'
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Error al guardar diagrama: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Error interno del servidor'
+            ], 500);
+        }
     }
+    public function destroy($id)
+    {
+        $diagrama = Diagrama::find($id);
+
+        $diagrama->update(['estado' => false]);
+        return Redirect::route('dashboard');
+    }
+    
 }

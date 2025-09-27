@@ -5,6 +5,8 @@ namespace App\Livewire;
 use Livewire\Component;
 
 use App\Models\Diagrama;
+use Illuminate\Support\Facades\Auth;
+
 
 class DiagramaTable extends Component
 {
@@ -15,8 +17,12 @@ class DiagramaTable extends Component
 
     public function mount()
     {
-        $this->diagramas = Diagrama::all(); // Ajusta según tu modelo
-    }
+        $this->diagramas = Diagrama::where('estado', true)
+            ->whereHas('usuariosDiagrama', function ($query) {
+                $query->where('user_id', Auth::id());
+            })->get();
+    }    
+
 
     public function openModal($diagramId)
     {

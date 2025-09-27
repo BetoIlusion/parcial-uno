@@ -15,6 +15,7 @@ class Diagrama extends Model
         'nombre',
         'descripcion',
         'contenido',
+        'estado',
     ];
 
     // protected $hidden = [
@@ -73,5 +74,14 @@ class Diagrama extends Model
                 ]
             ]
         ];
+    }
+    public function usuariosDiagrama()
+    {
+        return $this->hasMany(UsuarioDiagrama::class);
+    }   
+
+    public function reportes()
+    {
+        return $this->hasMany(DiagramaReporte::class, 'diagrama_id');
     }
 }
