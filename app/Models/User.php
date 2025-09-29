@@ -64,4 +64,8 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+    public function usuarioDiagrama()
+    {
+        return $this->hasMany(UsuarioDiagrama::class);
+    }
 }

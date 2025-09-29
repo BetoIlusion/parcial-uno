@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('usuario_diagramas', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained('users');
-            $table->foreignId('diagrama_id')->constrained('diagramas');
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->foreignId('diagrama_id')->constrained('diagramas')->onDelete('cascade');
             $table->string('actividad')->default('sin especificacion');
             $table->string('tipo_usuario')->default('creador');
             $table->boolean('estado')->default(true);

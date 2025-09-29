@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DiagramaController;
+use App\Models\User;
+
 
 Route::get('/', function () {
     return view('welcome');
@@ -14,6 +16,8 @@ Route::middleware([
 ])->group(function () {
 
     Route::get('/dashboard', [DiagramaController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/compartidos', [DiagramaController::class, 'compartidos'])->name('dashboard.compartidos');
+
 
     Route::prefix('/diagramas')->group(function () {
         Route::get('/uml', [DiagramaController::class, 'uml'])->name('uml.show');
@@ -26,8 +30,17 @@ Route::middleware([
         Route::delete('/{id}', [DiagramaController::class, 'destroy'])->name('diagramas.destroy');
         Route::get('/exportar-spring-boot/{id}', [DiagramaController::class, 'exportSpringboot'])
             ->name('diagramas.exportarSpringBoot');
+        Route::get('/{diagrama}/compartir', [DiagramaController::class, 'compartirDiagrama'])->name('diagramas.compartir');
+
 
         Route::post('/analizar-imagen', [DiagramaController::class, 'procesarImagen'])
             ->name('analizar.imagen');
     });
+
+    Route::get('/prueba', function () {
+        $usuarios = User::all();
+
+        return $usuarios;
+    })->name('prueba');
+
 });

@@ -113,7 +113,6 @@ class DiagramaController extends Controller
                 'message' => 'Diagrama guardado correctamente',
                 'reporte_id' => $reporte->id
             ], 200);
-
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::warning('Error de validación en diagrama reporte', ['errors' => $e->errors()]);
             return response()->json([
@@ -134,12 +133,29 @@ class DiagramaController extends Controller
 
     public function destroy($id)
     {
+        $user = Auth::user();
+        $userDiagrama = UsuarioDiagrama::where('user_id', $user->id)
+            ->where('diagrama_id', $id)->first();
         $diagrama = Diagrama::find($id);
-        $diagrama->update(['estado' => false]);
+        if ($userDiagrama->tipo_usuario != 'creador') {
+            $diagrama->delete(); //elimina en cascada con UsuarioDiagrama y DiagramaReporte}
+            $reportes = DiagramaReporte::where('diagrama_id', $id)->get();
+            foreach ($reportes as $reporte) {
+                $reporte->delete();
+            }
+            //  $diagrama->update(['estado' => false]);
+        } else {
+            $userDiagrama->delete();
+        }
         return Redirect::route('dashboard');
     }
+    public function compartirDiagrama($id)
+    {
+        $diagrama = Diagrama::find($id);
+        $user = Auth::user();
+    }
 
-     private function convertType($type)
+    private function convertType($type)
     {
         switch (strtolower($type)) {
             case 'int':
@@ -184,11 +200,11 @@ class DiagramaController extends Controller
         }
     }
 
-     public function exportSpringBoot($id)
+    public function exportSpringBoot($id)
     {
         try {
             Log::info('Iniciando exportación a Spring Boot', ['diagrama_id' => $id]);
-            
+
             $ultimoReporte = DiagramaReporte::query()
                 ->where('diagrama_id', $id)
                 ->latest()
@@ -208,7 +224,7 @@ class DiagramaController extends Controller
 
             $zipFileName = 'spring-boot-project-' . date('Y-m-d-His') . '.zip';
             $zipPath = storage_path('app/public/' . $zipFileName);
-            
+
             $zip = new ZipArchive();
             if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
                 throw new \Exception('No se puede crear el archivo ZIP');
@@ -231,29 +247,28 @@ class DiagramaController extends Controller
             $this->removeDirectory($tempDir);
 
             return response()->download($zipPath)->deleteFileAfterSend(true);
-
         } catch (\Exception $e) {
             Log::error('Error al exportar proyecto Spring Boot: ' . $e->getMessage());
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
-     private function createSpringBootStructure($baseDir, $diagramData)
+    private function createSpringBootStructure($baseDir, $diagramData)
     {
         // Crear estructura principal del proyecto
         $srcDir = $baseDir . '/src/main/java/com/example/demo';
         $resourcesDir = $baseDir . '/src/main/resources';
-        
+
         // Crear directorios necesarios
         $dirs = [
             $srcDir . '/model',
-            $srcDir . '/repository', 
+            $srcDir . '/repository',
             $srcDir . '/service',
             $srcDir . '/controller',
             $srcDir . '/dto',
             $resourcesDir
         ];
-        
+
         foreach ($dirs as $dir) {
             if (!mkdir($dir, 0755, true)) {
                 throw new \Exception("No se pudo crear directorio: $dir");
@@ -266,24 +281,24 @@ class DiagramaController extends Controller
         $this->generateMainClass($srcDir);
 
         // Procesar cada clase del diagrama
-    foreach ($diagramData['nodeDataArray'] as $classData) {
-        $className = $classData['name'];
-        $isInterface = isset($classData['stereotype']) && 
-                      in_array(strtolower($classData['stereotype']), ['interfaz', 'interface']);
-        
-        // Solo generar código para clases (no interfaces)
-        if (!$isInterface) {
-            $this->generateEntityClass($srcDir . '/model', $className, $classData);
-            $this->generateRepositoryInterface($srcDir . '/repository', $className);
-            $this->generateServiceInterface($srcDir . '/service', $className);
-            $this->generateServiceImpl($srcDir . '/service', $className);
-            $this->generateController($srcDir . '/controller', $className, $classData); // Pasar classData
-            
-            if (!empty($classData['properties'])) {
-                $this->generateDTO($srcDir . '/dto', $className, $classData);
+        foreach ($diagramData['nodeDataArray'] as $classData) {
+            $className = $classData['name'];
+            $isInterface = isset($classData['stereotype']) &&
+                in_array(strtolower($classData['stereotype']), ['interfaz', 'interface']);
+
+            // Solo generar código para clases (no interfaces)
+            if (!$isInterface) {
+                $this->generateEntityClass($srcDir . '/model', $className, $classData);
+                $this->generateRepositoryInterface($srcDir . '/repository', $className);
+                $this->generateServiceInterface($srcDir . '/service', $className);
+                $this->generateServiceImpl($srcDir . '/service', $className);
+                $this->generateController($srcDir . '/controller', $className, $classData); // Pasar classData
+
+                if (!empty($classData['properties'])) {
+                    $this->generateDTO($srcDir . '/dto', $className, $classData);
+                }
             }
         }
-    }
 
         // Generar archivo de ejemplos de requests HTTP
         $this->generateRequestsHttpFile($baseDir, $diagramData['nodeDataArray']);
@@ -365,7 +380,7 @@ class DiagramaController extends Controller
         </plugins>
     </build>
 </project>';
-        
+
         file_put_contents($baseDir . '/pom.xml', $content);
     }
 
@@ -380,11 +395,11 @@ spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
 spring.h2.console.enabled=true
 spring.jpa.hibernate.ddl-auto=update
 spring.jpa.show-sql=true";
-        
+
         file_put_contents($resourcesDir . '/application.properties', $content);
     }
 
-     private function generateMainClass($srcDir)
+    private function generateMainClass($srcDir)
     {
         $content = "package com.example.demo;
 
@@ -397,7 +412,7 @@ public class DemoApplication {
         SpringApplication.run(DemoApplication.class, args);
     }
 }";
-        
+
         file_put_contents($srcDir . '/DemoApplication.java', $content);
     }
 
@@ -405,24 +420,24 @@ public class DemoApplication {
     {
         $properties = isset($classData['properties']) ? $classData['properties'] : [];
         $methods = isset($classData['methods']) ? $classData['methods'] : [];
-        
+
         // Generar propiedades
         $propertiesCode = '';
         $hasId = false;
-        
+
         foreach ($properties as $prop) {
             $type = $this->convertType($prop['type']);
             $name = $prop['name'];
-            
+
             if (strtolower($name) === 'id') {
                 $hasId = true;
                 $propertiesCode .= "    @Id\n    @GeneratedValue(strategy = GenerationType.IDENTITY)\n";
             }
-            
+
             // Usar private para todos los campos
             $propertiesCode .= "    private {$type} {$name};\n\n";
         }
-        
+
         // Si no hay ID, agregarlo al principio
         if (!$hasId) {
             $propertiesCode = "    @Id\n    @GeneratedValue(strategy = GenerationType.IDENTITY)\n    private Long id;\n\n" . $propertiesCode;
@@ -433,14 +448,14 @@ public class DemoApplication {
         foreach ($methods as $method) {
             $methodName = $method['name'];
             $parameters = isset($method['parameters']) ? $method['parameters'] : [];
-            
+
             $paramList = [];
             foreach ($parameters as $param) {
                 $paramType = $this->convertType($param['type']);
                 $paramList[] = "{$paramType} {$param['name']}";
             }
             $paramStr = implode(', ', $paramList);
-            
+
             $methodsCode .= "    public void {$methodName}({$paramStr}) {\n        // TODO: Implementar {$methodName}\n    }\n\n";
         }
 
@@ -460,7 +475,7 @@ import lombok.AllArgsConstructor;
 @AllArgsConstructor
 public class {$className} {
 {$propertiesCode}{$methodsCode}}";
-        
+
         file_put_contents($dir . "/{$className}.java", $content);
     }
 
@@ -475,15 +490,15 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface {$className}Repository extends JpaRepository<{$className}, Long> {
 }";
-        
+
         file_put_contents($dir . "/{$className}Repository.java", $content);
     }
 
-    
+
     private function generateServiceInterface($dir, $className)
     {
         $varName = $this->camelCase($className);
-        
+
         $content = "package com.example.demo.service;
 
 import com.example.demo.model.{$className};
@@ -497,14 +512,14 @@ public interface {$className}Service {
     List<String> getPropertyNames();
     List<String> getMethodNames();
 }";
-        
+
         file_put_contents($dir . "/{$className}Service.java", $content);
     }
 
     private function generateServiceImpl($dir, $className)
     {
         $varName = $this->camelCase($className);
-        
+
         $content = "package com.example.demo.service;
 
 import com.example.demo.model.{$className};
@@ -575,35 +590,35 @@ public class {$className}ServiceImpl implements {$className}Service {
             .collect(Collectors.toList());
     }
 }";
-        
+
         file_put_contents($dir . "/{$className}ServiceImpl.java", $content);
     }
 
-     private function generateController($dir, $className, $classData)
-{
-    $varName = $this->camelCase($className);
-    $pluralVarName = $varName . 's';
-    
-    // Generar código de actualización dinámico basado en las propiedades reales
-    $updateLogic = '';
-    if (isset($classData['properties'])) {
-        foreach ($classData['properties'] as $prop) {
-            $propName = $prop['name'];
-            if (strtolower($propName) !== 'id') {
-                $updateLogic .= "            if ({$varName}.get" . ucfirst($propName) . "() != null) {\n";
-                $updateLogic .= "                existing.set" . ucfirst($propName) . "({$varName}.get" . ucfirst($propName) . "());\n";
-                $updateLogic .= "            }\n";
+    private function generateController($dir, $className, $classData)
+    {
+        $varName = $this->camelCase($className);
+        $pluralVarName = $varName . 's';
+
+        // Generar código de actualización dinámico basado en las propiedades reales
+        $updateLogic = '';
+        if (isset($classData['properties'])) {
+            foreach ($classData['properties'] as $prop) {
+                $propName = $prop['name'];
+                if (strtolower($propName) !== 'id') {
+                    $updateLogic .= "            if ({$varName}.get" . ucfirst($propName) . "() != null) {\n";
+                    $updateLogic .= "                existing.set" . ucfirst($propName) . "({$varName}.get" . ucfirst($propName) . "());\n";
+                    $updateLogic .= "            }\n";
+                }
             }
         }
-    }
-    
-    // Si no hay propiedades específicas, usar una actualización genérica
-    if (empty($updateLogic)) {
-        $updateLogic = "            // Usar actualización directa ya que no hay propiedades específicas\n";
-        $updateLogic .= "            {$varName}.setId(existing.getId());\n";
-    }
 
-    $content = "package com.example.demo.controller;
+        // Si no hay propiedades específicas, usar una actualización genérica
+        if (empty($updateLogic)) {
+            $updateLogic = "            // Usar actualización directa ya que no hay propiedades específicas\n";
+            $updateLogic .= "            {$varName}.setId(existing.getId());\n";
+        }
+
+        $content = "package com.example.demo.controller;
 
 import com.example.demo.model.{$className};
 import com.example.demo.service.{$className}Service;
@@ -708,14 +723,14 @@ public class {$className}Controller {
         return response;
     }
 }";
-        
-    file_put_contents($dir . "/{$className}Controller.java", $content);
-}
 
-     private function generateDTO($dir, $className, $classData)
+        file_put_contents($dir . "/{$className}Controller.java", $content);
+    }
+
+    private function generateDTO($dir, $className, $classData)
     {
         $properties = isset($classData['properties']) ? $classData['properties'] : [];
-        
+
         $propertiesCode = '';
         foreach ($properties as $prop) {
             $type = $this->convertType($prop['type']);
@@ -730,7 +745,7 @@ import lombok.Data;
 @Data
 public class {$className}DTO {
 {$propertiesCode}}";
-        
+
         file_put_contents($dir . "/{$className}DTO.java", $content);
     }
 
@@ -740,21 +755,21 @@ public class {$className}DTO {
         $baseUrl = "http://localhost:8080/api";
 
         foreach ($classes as $class) {
-            $isInterface = isset($class['stereotype']) && 
-                          in_array(strtolower($class['stereotype']), ['interfaz', 'interface']);
-            
+            $isInterface = isset($class['stereotype']) &&
+                in_array(strtolower($class['stereotype']), ['interfaz', 'interface']);
+
             if (!$isInterface) {
                 $className = $class['name'];
                 $pluralVarName = $this->camelCase($className) . 's';
-                
+
                 $content .= "### ==================================\n";
                 $content .= "### {$className} Endpoints\n";
                 $content .= "### ==================================\n\n";
-                
+
                 $content .= "### Crear nuevo {$className}\n";
                 $content .= "POST {$baseUrl}/{$pluralVarName}\n";
                 $content .= "Content-Type: application/json\n\n";
-                
+
                 $sampleJson = $this->generateSampleJson($class);
                 $content .= $sampleJson . "\n\n";
 

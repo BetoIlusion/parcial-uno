@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('diagrama_reportes', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained('users');
-            $table->foreignId('diagrama_id')->constrained('diagramas');
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->foreignId('diagrama_id')->constrained('diagramas')->onDelete('cascade');
             $table->text('contenido')->nullable();
             $table->timestamps();
         });
