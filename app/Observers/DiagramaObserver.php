@@ -9,17 +9,17 @@ class DiagramaObserver
 {
     public function created(Diagrama $diagrama)
     {
-        broadcast(new DiagramaActualizado($diagrama->id));
+        //broadcast(new DiagramaActualizado($diagrama->id));
     }
 
     public function updated(Diagrama $diagrama)
     {
-        broadcast(new DiagramaActualizado($diagrama->id));
+        //broadcast(new DiagramaActualizado($diagrama->id));
     }
 
     public function deleted(Diagrama $diagrama)
     {
-        broadcast(new DiagramaActualizado($diagrama->id));
+        //broadcast(new DiagramaActualizado($diagrama->id));
     }
 
     /**
