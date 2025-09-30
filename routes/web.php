@@ -31,7 +31,7 @@ Route::middleware([
         Route::get('/exportar-spring-boot/{id}', [DiagramaController::class, 'exportSpringboot'])
             ->name('diagramas.exportarSpringBoot');
         Route::get('/{diagrama}/compartir', [DiagramaController::class, 'compartirDiagrama'])->name('diagramas.compartir');
-
+        Route::post('/update-with-ai', [DiagramaController::class, 'updateWithAI'])->name('diagramas.updateWithAI');
 
         Route::post('/analizar-imagen', [DiagramaController::class, 'procesarImagen'])
             ->name('analizar.imagen');

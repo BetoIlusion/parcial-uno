@@ -63,6 +63,13 @@
                 <button onclick="addNewClass()">Add New Class</button>
                 {{-- <button onclick="location.href='{{ route('diagramas.exportarSpringBoot', ['id' => $id]) }}'">Export to Spring Boot</button> --}}
             </div>
+            {{-- Panel para la IA --}}
+            <div id="aiPanel" style="padding: 10px; text-align: center; width: 100%; border-top: 1px solid black;">
+                <h3 style="margin-bottom: 5px;">Asistente IA</h3>
+                <input type="text" id="aiPrompt" placeholder="Ej: Agrega una clase 'Producto' con id y nombre"
+                    style="width: 70%; padding: 5px;">
+                <button onclick="updateWithAI()" style="padding: 5px;">Generar</button>
+            </div>
             <div id="myDiagramDiv"></div>
         </div>
     </div>
@@ -310,56 +317,56 @@
             }
 
             function generateDiagramOutput() {
-    try {
-        var currentDiagramJson = myDiagram.model.toJson();
-        
-        console.log('Enviando diagrama...', {
-            diagramaId: diagramaId,
-            dataLength: currentDiagramJson.length
-        });
+                try {
+                    var currentDiagramJson = myDiagram.model.toJson();
 
-        var csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
-        var csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : null;
-        
-        if (!csrfToken) {
-            console.error('No se encontró el token CSRF');
-            return;
-        }
+                    console.log('Enviando diagrama...', {
+                        diagramaId: diagramaId,
+                        dataLength: currentDiagramJson.length
+                    });
 
-        fetch("{{ route('diagrama-reporte.create') }}", {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': csrfToken
-            },
-            body: JSON.stringify({
-                diagramData: currentDiagramJson,
-                diagramaId: diagramaId
-            })
-        })
-        .then(response => {
-            console.log('Respuesta recibida:', response.status, response.statusText);
-            
-            if (!response.ok) {
-                return response.text().then(text => {
-                    console.error('Error detallado:', text);
-                    throw new Error('HTTP ' + response.status + ' - ' + text);
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Diagrama guardado correctamente:', data);
-        })
-        .catch(error => {
-            console.error('Error completo al guardar:', error);
-        });
-        
-    } catch (error) {
-        console.error('Error en generateDiagramOutput:', error);
-    }
-};
+                    var csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+                    var csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : null;
+
+                    if (!csrfToken) {
+                        console.error('No se encontró el token CSRF');
+                        return;
+                    }
+
+                    fetch("{{ route('diagrama-reporte.create') }}", {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken
+                            },
+                            body: JSON.stringify({
+                                diagramData: currentDiagramJson,
+                                diagramaId: diagramaId
+                            })
+                        })
+                        .then(response => {
+                            console.log('Respuesta recibida:', response.status, response.statusText);
+
+                            if (!response.ok) {
+                                return response.text().then(text => {
+                                    console.error('Error detallado:', text);
+                                    throw new Error('HTTP ' + response.status + ' - ' + text);
+                                });
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log('Diagrama guardado correctamente:', data);
+                        })
+                        .catch(error => {
+                            console.error('Error completo al guardar:', error);
+                        });
+
+                } catch (error) {
+                    console.error('Error en generateDiagramOutput:', error);
+                }
+            };
 
 
             myDiagram.linkTemplate =
@@ -977,11 +984,104 @@
             };
             // Añadir un rebuild para refrescar nodos existentes (esto fuerza la aplicación del template a nodos iniciales)
             myDiagram.rebuildParts();
+
+            // 🔥 ¡AQUÍ ESTÁ LA CORRECCIÓN! Llamamos a la función para escuchar eventos.
+            setupEchoListener(myDiagram, diagramaId);
+        }
+
+        // Función para actualizar el diagrama con IA
+        function updateWithAI() {
+            var prompt = document.getElementById('aiPrompt').value;
+            if (!prompt) {
+                alert('Por favor, introduce una instrucción para la IA.');
+                return;
+            }
+
+            var myDiagram = go.Diagram.fromDiv('myDiagramDiv');
+            var currentDiagramJson = myDiagram.model.toJson();
+            var diagramaId = @json($diagramaId);
+
+            console.log('Enviando prompt a la IA...', {
+                diagramaId: diagramaId,
+                prompt: prompt
+            });
+
+            var csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+            var csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : null;
+
+            if (!csrfToken) {
+                console.error('No se encontró el token CSRF');
+                return;
+            }
+
+            // Muestra un indicador de carga (opcional)
+            document.getElementById('aiPrompt').disabled = true;
+            document.querySelector('#aiPanel button').disabled = true;
+            document.querySelector('#aiPanel button').textContent = 'Generando...';
+
+            fetch("{{ route('diagramas.updateWithAI', ['diagrama' => $diagramaId]) }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    body: JSON.stringify({
+                        diagramData: currentDiagramJson,
+                        diagramaId: diagramaId,
+                        prompt: prompt
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    console.log('Diagrama actualizado por la IA:', data.updatedDiagram);
+                    // Actualizar el modelo del diagrama GoJS con el nuevo JSON
+                    myDiagram.model = go.GraphLinksModel.fromJson(data.updatedDiagram);
+                    // Recargar la página para "redirigir" a la misma vista y sincronizar
+                    window.location.reload();
+                })
+                .catch(error => {
+                    console.error('Error al actualizar con IA:', error);
+                    alert('Ocurrió un error al procesar la solicitud de IA: ' + error.message);
+                }).finally(() => {
+                    // Restablece el UI
+                    document.getElementById('aiPrompt').disabled = false;
+                    document.querySelector('#aiPanel button').disabled = false;
+                    document.querySelector('#aiPanel button').textContent = 'Generar';
+                });
+        }
+
+        // Una vez que 'init' se ha ejecutado y el diagrama está listo, configuramos Echo.
+        function setupEchoListener(diagram, diagramId) {
+            if (diagramId) {
+                window.Echo.private(`diagrama.${diagramaId}`)
+                    .listen('.diagrama.actualizado', (e) => {
+                        console.log('Diagrama actualizado recibido vía Reverb:', e);
+
+                        // 🔥 SOLUCIÓN SIMPLE: Recargar la página para ver los cambios.
+                        // El método toOthers() en el controlador asegura que esta recarga
+                        // solo ocurra en los navegadores de los otros colaboradores.
+                        console.log('Forzando recarga de la página para sincronizar cambios.');
+                        window.location.reload();
+                    });
+            }
         }
 
         // Initialize when DOM is loaded
-        window.addEventListener('DOMContentLoaded', init);
+        window.addEventListener('DOMContentLoaded', function() {
+            // Definimos la función que maneja los cambios para poder añadirla y quitarla
+            window.onDiagramChanged = function(e) {
+                if (e.isTransactionFinished) {
+                    generateDiagramOutput();
+                }
+            };
+            init(); // Llamamos a init después de definir la función global
+        });
     </script>
+
 </body>
 
 </html>

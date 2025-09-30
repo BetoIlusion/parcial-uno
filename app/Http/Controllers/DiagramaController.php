@@ -10,11 +10,15 @@ use Illuminate\Support\Facades\Json;
 use App\Models\DiagramaReporte;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use App\Events\DiagramaActualizado;
 use App\Models\Diagrama;
 use ZipArchive;
 use App\Models\UsuarioDiagrama;
 use App\Models\User;
 use Illuminate\Support\Facades\File;
+use App\Events\DiagramaEliminado;
+use Illuminate\Support\Facades\Http;
+
 
 class DiagramaController extends Controller
 {
@@ -107,6 +111,9 @@ class DiagramaController extends Controller
             }
 
             $reporte = DiagramaReporte::crear($user->id, $diagramaId, $diagramaData);
+
+            // 🔥 Transmitir el cambio a otros usuarios en el mismo diagrama
+            broadcast(new DiagramaActualizado($diagramaId, $diagramaJson))->toOthers();
             Log::info('Diagrama reporte creado exitosamente', ['reporte_id' => $reporte->id]);
 
             return response()->json([
@@ -137,7 +144,8 @@ class DiagramaController extends Controller
         $userDiagrama = UsuarioDiagrama::where('user_id', $user->id)
             ->where('diagrama_id', $id)->first();
         $diagrama = Diagrama::find($id);
-        if ($userDiagrama->tipo_usuario != 'creador') {
+
+        if ($userDiagrama->tipo_usuario == 'creador') {
             $diagrama->delete(); //elimina en cascada con UsuarioDiagrama y DiagramaReporte}
             $reportes = DiagramaReporte::where('diagrama_id', $id)->get();
             foreach ($reportes as $reporte) {
@@ -147,8 +155,204 @@ class DiagramaController extends Controller
         } else {
             $userDiagrama->delete();
         }
+        // 🔥 Evento específico para eliminación
+        broadcast(new DiagramaEliminado($id, $user->id))->toOthers();
         return Redirect::route('dashboard');
     }
+
+    /**
+     * Actualiza el diagrama usando una IA (simulado).
+     */
+    public function updateWithAI(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'diagramData' => 'required|string',
+                'diagramaId' => 'required|exists:diagramas,id',
+                'prompt' => 'required|string|max:500',
+            ]);
+
+            $diagramaJson = $validated['diagramData'];
+            $userPrompt = $validated['prompt'];
+            $diagramaId = $validated['diagramaId'];
+
+            // Llamada a la API de Gemini
+            $updatedDiagramJson = $this->callGeminiAI($diagramaJson, $userPrompt);
+
+            // Decodificar para validar y guardar
+            $updatedDiagramData = json_decode($updatedDiagramJson, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::error('No se pudo decodificar el JSON generado por Gemini.', ['jsonString' => $updatedDiagramJson]);
+                throw new \Exception('La respuesta de la IA no es un JSON válido: ' . json_last_error_msg());
+            }
+
+            // Verificar estructura mínima de GoJS GraphLinksModel
+            if (
+                !isset($updatedDiagramData['class']) || $updatedDiagramData['class'] !== 'GraphLinksModel' ||
+                !isset($updatedDiagramData['nodeDataArray']) || !isset($updatedDiagramData['linkDataArray'])
+            ) {
+                Log::error('El JSON devuelto no cumple con la estructura GoJS GraphLinksModel.', ['jsonString' => $updatedDiagramJson]);
+                throw new \Exception('El JSON devuelto no cumple con la estructura GoJS GraphLinksModel.');
+            }
+
+            // Guardar el nuevo estado en un reporte
+            DiagramaReporte::crear(Auth::id(), $diagramaId, $updatedDiagramData);
+
+            // Transmitir el cambio a otros usuarios
+            broadcast(new DiagramaActualizado($diagramaId, $updatedDiagramJson))->toOthers();
+
+            return response()->json([
+                'message' => 'Diagrama actualizado con IA.',
+                'updatedDiagram' => $updatedDiagramData
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en updateWithAI: ' . $e->getMessage());
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Simula una llamada a un servicio de IA para modificar el JSON del diagrama.
+     *
+     * @param string $diagramaJson
+     * @param string $userPrompt
+     * @return string
+     */
+    private function callGeminiAI(string $diagramaJson, string $userPrompt): string
+    {
+        $apiKey = env('GEMINI_API_KEY');
+        if (!$apiKey) {
+            Log::error('La clave API de Gemini no está configurada en el archivo .env.');
+            throw new \Exception('Clave API de Gemini no configurada en .env');
+        }
+
+        $jsonEjemplo = json_encode(Diagrama::diagramaInicial(), JSON_PRETTY_PRINT);
+
+        // Prompt estricto para devolver solo JSON puro
+        $promptText = <<<EOT
+Eres un experto en ingeniería de software y UML. Tu tarea es actualizar el JSON de un diagrama de clases UML en formato GoJS GraphLinksModel según las instrucciones proporcionadas.
+
+Ejemplo de JSON válido para GoJS GraphLinksModel:
+{$jsonEjemplo}
+
+JSON actual del diagrama a actualizar:
+{$diagramaJson}
+
+Instrucciones para actualizar:
+{$userPrompt}
+
+Instrucciones estrictas:
+Devuelve ÚNICAMENTE el JSON actualizado en el formato exacto de GoJS GraphLinksModel, con los campos: 
+"class", "copiesArrays", "copiesArrayObjects", "linkCategoryProperty", "nodeDataArray", y "linkDataArray".
+
+NO incluyas texto adicional, explicaciones, markdown (como ```json), ni comentarios.  
+Asegúrate de que el JSON sea válido, completo, y no esté truncado.  
+Mantén la estructura de nodos (clases con "key", "name", "properties", "methods") y enlaces (con "from", "to", "relationship", "multiplicityFrom", "multiplicityTo").  
+Si no puedes aplicar alguna instrucción, mantén el JSON original con los campos requeridos.
+
+Ejemplo de respuesta esperada:
+{"class":"GraphLinksModel","copiesArrays":true,"copiesArrayObjects":true,"linkCategoryProperty":"relationship","nodeDataArray":[],"linkDataArray":[]}
+EOT;
+
+        $apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}";
+
+        $payload = [
+            'contents' => [
+                [
+                    'parts' => [
+                        ['text' => $promptText]
+                    ]
+                ]
+            ],
+            'generationConfig' => [
+                'response_mime_type' => 'application/json',
+                'temperature'        => 0.4,
+                'topK'               => 32,
+                'topP'               => 1,
+                'maxOutputTokens'    => 2048,
+                'stopSequences'      => []
+            ],
+            'safetySettings' => [
+                ['category' => 'HARM_CATEGORY_HARASSMENT',       'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'],
+                ['category' => 'HARM_CATEGORY_HATE_SPEECH',      'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'],
+                ['category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'],
+                ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_MEDIUM_AND_ABOVE']
+            ]
+        ];
+
+        Log::info("Enviando solicitud a Google Gemini API (gemini-2.5-flash). Endpoint: " . strtok($apiUrl, '?'));
+        Log::debug('Payload: ' . json_encode($payload));
+
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json',
+        ])->timeout(60)->post($apiUrl, $payload);
+
+        Log::info('Respuesta recibida de Google Gemini API.', ['status_code' => $response->status()]);
+
+        if ($response->failed()) {
+            Log::error('Error en la llamada a la API de Google Gemini.', [
+                'status' => $response->status(),
+                'body'   => $response->body()
+            ]);
+            throw new \Exception('Error en la respuesta de Gemini: Status ' . $response->status() . ' - ' . $response->body());
+        }
+
+        $data = $response->json();
+        Log::debug('Respuesta JSON de Google Gemini decodificada.');
+
+        $jsonString = data_get($data, 'candidates.0.content.parts.0.text');
+        if (is_null($jsonString)) {
+            $finishReason  = data_get($data, 'candidates.0.finishReason', 'N/A');
+            $safetyRatings = json_encode(data_get($data, 'candidates.0.safetyRatings', []));
+
+            Log::warning('No se encontró texto en la respuesta de Gemini o fue bloqueada.', [
+                'finishReason'  => $finishReason,
+                'safetyRatings' => $safetyRatings
+            ]);
+
+            if ($finishReason === 'SAFETY') {
+                throw new \Exception('La respuesta fue bloqueada por razones de seguridad.');
+            } elseif ($finishReason === 'RECITATION') {
+                throw new \Exception('La respuesta fue bloqueada por razones de citación.');
+            } elseif (empty(data_get($data, 'candidates'))) {
+                $promptFeedback = json_encode(data_get($data, 'promptFeedback', 'N/A'));
+                Log::error('La solicitud fue probablemente bloqueada antes de generar candidatos.', [
+                    'promptFeedback' => $promptFeedback
+                ]);
+                throw new \Exception('La solicitud fue bloqueada (posiblemente por seguridad del prompt).');
+            } else {
+                throw new \Exception('No se pudo obtener una respuesta válida de Gemini.');
+            }
+        }
+
+        // Limpiar el string: eliminar markdown, saltos de línea, etc.
+        $jsonString = preg_replace('/^```json|```$/m', '', $jsonString);
+        $jsonString = trim($jsonString);
+        $jsonString = preg_replace('/\s+/', ' ', $jsonString);
+
+        // Validar el JSON
+        $jsonDecoded = json_decode($jsonString, true);
+        if (is_null($jsonDecoded)) {
+            Log::error('No se pudo decodificar el JSON generado por Gemini.', ['jsonString' => $jsonString]);
+            throw new \Exception('No se pudo decodificar el JSON generado por Gemini: ' . json_last_error_msg());
+        }
+
+        // Verificar estructura mínima de GoJS GraphLinksModel
+        if (
+            !isset($jsonDecoded['class']) || $jsonDecoded['class'] !== 'GraphLinksModel' ||
+            !isset($jsonDecoded['nodeDataArray']) || !isset($jsonDecoded['linkDataArray'])
+        ) {
+            Log::error('El JSON devuelto no cumple con la estructura GoJS GraphLinksModel.', [
+                'jsonString' => $jsonString
+            ]);
+            throw new \Exception('El JSON devuelto no cumple con la estructura GoJS GraphLinksModel.');
+        }
+
+        Log::info('JSON generado por Gemini decodificado correctamente.');
+        return json_encode($jsonDecoded);
+    }
+
+
     public function compartirDiagrama($id)
     {
         $diagrama = Diagrama::find($id);

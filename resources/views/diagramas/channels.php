@@ -1,7 +1,8 @@
 <?php
 
-use App\Models\User;
 use Illuminate\Support\Facades\Broadcast;
+use App\Models\Diagrama;
+use App\Models\User;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,6 +16,6 @@ use Illuminate\Support\Facades\Broadcast;
 */
 
 Broadcast::channel('diagrama.{diagramaId}', function (User $user, int $diagramaId) {
-    // Verifica si el usuario autenticado tiene acceso a este diagrama.
-    return $user->usuarioDiagrama()->where('diagrama_id', $diagramaId)->exists();
+    $diagrama = Diagrama::find($diagramaId);
+    return $diagrama && $diagrama->usuarios->contains($user);
 });

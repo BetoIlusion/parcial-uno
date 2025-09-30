@@ -28,6 +28,17 @@
                                             <a href="{{ route('diagramas.show', $item->id) }}" class="flex items-center justify-center p-2 transition-colors duration-200 bg-gray-100 rounded-lg text-gray-500 hover:bg-green-200 hover:text-green-700 focus:outline-none" title="Editar diagrama">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 010 2.828l-9.9 9.9a1 1 0 01-.39.242l-4 1.333a1 1 0 01-1.263-1.263l1.333-4a1 1 0 01.242-.39l9.9-9.9a2 2 0 012.828 0z" /></svg>
                                             </a>
+                                             {{-- BOTÓN EXPORTAR --}}
+                                            <a href="{{ route('diagramas.exportarSpringBoot', $item->id) }}"
+                                                class="flex items-center justify-center p-2 transition-colors duration-200 bg-gray-100 rounded-lg text-gray-500 hover:bg-purple-200 hover:text-purple-700 focus:outline-none"
+                                                title="Exportar Diagrama">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
+                                                    viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                </svg>
+                                            </a>
                                             {{-- El botón de gestionar usuarios solo se muestra si el usuario es 'creador' --}}
                                             @if ($tipoUsuario === 'creador')
                                                 {{-- BOTÓN LISTA DE USUARIOS --}}
